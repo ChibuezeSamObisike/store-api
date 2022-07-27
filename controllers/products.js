@@ -8,12 +8,16 @@ const getAllProductsStatic = async(req, res) => {
     // });
     // const products = await Product.find({}).sort('-name price');
     //Skip and Limit are for pagination functionality
-    const products = await Product.find({}).select('name price').limit(4).skip(2);
+    const products = await Product.find({ price: { $gt: 30 } })
+        .select('name price')
+        .sort('price')
+        .limit(4)
+        .skip(2);
     res.status(200).json({ products, nbHits: products.length });
 };
 
 const getAllProducts = async(req, res) => {
-    const { featured, company, name, sort, fields } = req.query;
+    const { featured, company, name, sort, fields, numericFilters } = req.query;
     const queryObject = {};
     if (featured) {
         queryObject.featured = featured === 'true' ? true : false;
@@ -24,6 +28,28 @@ const getAllProducts = async(req, res) => {
     if (name) {
         //We are searching for this pattern, case insensitive
         queryObject.name = { $regex: name, $options: 'i' };
+    }
+    if (numericFilters) {
+        const operatorMap = {
+            '>': '$gt',
+            '>=': '$gte',
+            '=': '$eq',
+            '<': '$lt',
+            '<=': '$lte',
+        };
+        const regEx = /\b(<|>|>=|=|<|<=)\b/g;
+        let filters = numericFilters.replace(
+            regEx,
+            (match) => `-${operatorMap[match]}-`
+        );
+        const options = ['price', 'rating'];
+        filters = filters.split(',').forEach((i) => {
+            const [field, operator, value] = items.split('-');
+            if (options.includes(field)) {
+                queryObject[field] = {
+                    [operator]: Number(value) };
+            }
+        });
     }
     let result = Product.find(queryObject);
     // console.log(req.query);
